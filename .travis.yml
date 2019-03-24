@@ -1,0 +1,15 @@
+language: node_js
+node_js:
+  - "8"
+sudo: required
+dist: trusty
+before_install:
+  - npm cache clean --force
+script: npm run build:all
+matrix:
+  notifications:
+    email:
+      recipients:
+        - getsaf@gmail.com
+      on_success: change
+      on_failure: change
