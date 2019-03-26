@@ -3,6 +3,13 @@ Splunk logging for JavaScript
 
 See the [Splunk HEC Docs](https://docs.splunk.com/Documentation/Splunk/latest/Data/UsetheHTTPEventCollector) for more info.
 
+### NOTE: This is a pre-release, not ready for production use just yet.
+
+TODO:
+ * Allow supplying an onBeforeLog hook after logger creation.
+ * Test on an actual Splunk server.
+ * Refactor the Logger class to make it less visible (ie: Encourage Logger.custom and Logger.singleton over Logger instantiation).
+
 ### Quickstart
 
 ```sh
