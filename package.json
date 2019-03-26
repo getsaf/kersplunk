@@ -5,6 +5,8 @@
   "main": "index.js",
   "types": "index.d.ts",
   "scripts": {
+    "preversion": "npm run build:all",
+    "postversion": "echo 'Now run:\ngit push --follow-tags && npm publish'",
     "build:all": "npm run lint && npm run test && npm run build",
     "build": "npm run clean && tsc",
     "clean": "rm -rf dist",
