@@ -6,9 +6,7 @@ See the [Splunk HEC Docs](https://docs.splunk.com/Documentation/Splunk/latest/Da
 ### NOTE: This is a pre-release, not ready for production use just yet.
 
 TODO:
- * Allow supplying an onBeforeLog hook after logger creation.
  * Test on an actual Splunk server.
- * Refactor the Logger class to make it less visible (ie: Encourage Logger.custom and Logger.singleton over Logger instantiation).
 
 ### Quickstart
 
@@ -43,9 +41,9 @@ Each log entry is tagged with a `logType` property. These are intended to be bro
 * `warn` - Warnings (usually for recoverable errors)
 * `error` - Hard exceptions
 
-You may scrap these and create your own set by passing in your logger types into the `singleton` or `custom` methods.
+You may scrap these and create your own set by passing in your logger types into the `singleton` or `create` methods.
 ```typescript
-const myLogger = Logger.custom(config, 'happy', 'sad');
+const myLogger = Logger.create(config, 'happy', 'sad');
 myLogger.happy('Wooo!! 😀'); // -> {logType: 'happy', eventName: 'Wooo!! 😀'}
 myLogger.sad('Booooo ☹️'); // -> {logType: 'sad', eventName: 'Booooo ☹️'}
 ```
@@ -73,7 +71,7 @@ will create a log entry in Splunk like this:
 |--|--|--|
 | splunkUrl | `string`  | The URL to your [Splunk HEC Collector](https://docs.splunk.com/Documentation/Splunk/latest/Data/UsetheHTTPEventCollector) endpoint |
 | authToken | `string` | Your Splunk HEC token |
-| beforeLog | `function` | Allows for adding common log properties globally |
+| interceptor | `function` | Allows for adding common log properties globally |
 |TODO| FINISH| THIS TABLE|
 
 ## API
@@ -84,7 +82,4 @@ will create a log entry in Splunk like this:
 Creates a "singleton" logger instance. The intention is that for a given JavaScript process, only **one** logger will ever be created by this method. This is useful if you would like to configure your logger once in your application and all modules will receive the same `Logger` instance.
 
 By default, the singleton method will be equipped with the default [`Log Types`.](#log-types)
-
-#### `log(logType: string, eventName: string, details?: object)`
-> NOTE:  Don't use this directly, you probably want to use a custom [Log Type](#log-types) instead
 

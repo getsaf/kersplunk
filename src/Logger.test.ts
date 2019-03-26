@@ -57,16 +57,28 @@ describe('Logger', () => {
     throttleDuration: 10000,
   };
 
-  describe('custom', () => {
+  describe('create', () => {
     it('creates a logger with custom log types', async () => {
-      const logger = Logger.custom(config, 'fooLevel', 'barLevel');
+      const logger = Logger.create(config, 'fooLevel', 'barLevel');
       logger.fooLevel('FOO');
       logger.barLevel('BAR');
-      logger.flush();
+      await logger.flush();
 
       expectToHaveLogged([
         { logType: 'fooLevel', eventName: 'FOO' },
         { logType: 'barLevel', eventName: 'BAR' },
+      ]);
+    });
+
+    it('creates a logger with the default log types', async () => {
+      const logger = Logger.create(config);
+      logger.info('FOO');
+      logger.debug('BAR');
+      await logger.flush();
+
+      expectToHaveLogged([
+        { logType: 'info', eventName: 'FOO' },
+        { logType: 'debug', eventName: 'BAR' },
       ]);
     });
   });
@@ -89,10 +101,10 @@ describe('Logger', () => {
       expectToHaveLogged([{logType: 'info', eventName: 'fooEvent'}]);
     });
 
-    it('can create a logger with custom log types', () => {
+    it('can create a logger with custom log types', async () => {
       const logger = Logger.singleton(config, 'foo');
       logger.foo('fooEvent');
-      logger.flush();
+      await logger.flush();
 
       expectToHaveLogged([ {logType: 'foo', eventName: 'fooEvent'} ]);
     });
@@ -110,8 +122,8 @@ describe('Logger', () => {
 
   describe('flush', () => {
     it('submits to the collector endpoint', async () => {
-      const logger = new Logger({...config, splunkUrl: 'http://foo-bar'});
-      logger.log('fooType', 'barEvent', {baz: 'bat'});
+      const logger = Logger.create({...config, splunkUrl: 'http://foo-bar'});
+      logger.info('barEvent', {baz: 'bat'});
       await logger.flush();
 
       expect(logs).toEqual([
@@ -120,8 +132,8 @@ describe('Logger', () => {
     });
 
     it('authenticates with the hecToken', async () => {
-      const logger = new Logger({...config, authToken: 'FOO-TOKEN'});
-      logger.log('fooType', 'barEvent', {baz: 'bat'});
+      const logger = Logger.create({...config, authToken: 'FOO-TOKEN'});
+      logger.info('barEvent', {baz: 'bat'});
       await logger.flush();
 
       expect(logs[0].requestConfig).toEqual(
@@ -130,33 +142,33 @@ describe('Logger', () => {
     });
 
     it('does not submit when buffer is empty', async () => {
-      const logger = new Logger({...config, maxBuffer: 2});
+      const logger = Logger.create({...config, maxBuffer: 2});
       await logger.flush();
 
       expect(logs.length).toBe(0);
     });
   });
 
-  describe('log', () => {
+  describe('logging', () => {
     it('serializes the details immediately so later mutations do not affect older logs', async () => {
-      const logger = new Logger(config);
+      const logger = Logger.create(config);
       const details = {foo: 'foo'};
-      logger.log('group1', 'one', details);
+      logger.info('one', details);
       details.foo = 'new foo';
-      logger.log('group1', 'two', details);
+      logger.info('two', details);
       await logger.flush();
 
       expectToHaveLogged(
         [
-          { logType: 'group1', eventName: 'one', foo: 'foo' },
-          { logType: 'group1', eventName: 'two', foo: 'new foo' },
+          { eventName: 'one', foo: 'foo' },
+          { eventName: 'two', foo: 'new foo' },
         ],
       );
     });
 
     it('incudes static splunkMeta properties', async () => {
-      const logger = new Logger({...config, splunkMeta: {time: 123, host: 'my host'}});
-      logger.log('group1', 'one');
+      const logger = Logger.create({...config, splunkMeta: {time: 123, host: 'my host'}});
+      logger.info('foo');
       await logger.flush();
 
       expect(logs[0].logs[0]).toEqual(expect.objectContaining({
@@ -166,8 +178,8 @@ describe('Logger', () => {
 
     it('provides a timestamp with <sec>.<ms> by default', async () => {
       jest.spyOn(Date, 'now').mockReturnValue(12345);
-      const logger = new Logger(config);
-      logger.log('group1', 'one');
+      const logger = Logger.create(config);
+      logger.info('foo');
       await logger.flush();
 
       expect(logs[0].logs[0]).toEqual(expect.objectContaining({
@@ -176,11 +188,11 @@ describe('Logger', () => {
     });
 
     it('incudes dynamic splunkMeta properties', async () => {
-      const logger = new Logger({
+      const logger = Logger.create({
         ...config,
         splunkMeta: () => ({time: 123, host: 'my host'}),
       });
-      logger.log('group1', 'one');
+      logger.info('foo');
       await logger.flush();
 
       expect(logs[0].logs[0]).toEqual(expect.objectContaining({
@@ -189,42 +201,53 @@ describe('Logger', () => {
     });
   });
 
-  describe('beforeLog', () => {
-    it('modifies the outgoing log details with beforeLog return', async () => {
-      const logger = new Logger({
+  describe('interceptors', () => {
+    it('modifies the outgoing log details with intercept return', async () => {
+      const logger = Logger.create({
         ...config,
-        beforeLog: (originalDetails) => ({...originalDetails, newDetails: 'bar'}),
+        interceptor: (originalDetails) => ({...originalDetails, newDetails: 'bar'}),
       });
-      logger.log('group1', 'one', {originalDetails: 'foo'});
+      logger.info('one', {originalDetails: 'foo'});
       await logger.flush();
 
       expectToHaveLogged([
-        {logType: 'group1', eventName: 'one', originalDetails: 'foo', newDetails: 'bar'},
+        {eventName: 'one', originalDetails: 'foo', newDetails: 'bar'},
+      ]);
+    });
+
+    it('can be set after the logger is created', async () => {
+      const logger = Logger.create(config);
+      logger.interceptor = (originalDetails) => ({...originalDetails, newDetails: 'bar'});
+      logger.info('one', {originalDetails: 'foo'});
+      await logger.flush();
+
+      expectToHaveLogged([
+        {eventName: 'one', originalDetails: 'foo', newDetails: 'bar'},
       ]);
     });
   });
 
   describe('buffering', () => {
     it('automatically flushes logs when the buffer is full', () => {
-      const logger = new Logger({...config, maxBuffer: 3});
-      logger.log('group1', 'one');
-      logger.log('group1', 'two');
-      logger.log('group1', 'three');
+      const logger = Logger.create({...config, maxBuffer: 3});
+      logger.info('group1:one');
+      logger.info('group1:two');
+      logger.info('group1:three');
       // Buffer max hit
-      logger.log('group2', 'four');
-      logger.log('group2', 'five');
-      logger.log('group2', 'six');
+      logger.info('group2:four');
+      logger.info('group2:five');
+      logger.info('group2:six');
 
       expectToHaveLogged(
         [
-          { logType: 'group1', eventName: 'one' },
-          { logType: 'group1', eventName: 'two' },
-          { logType: 'group1', eventName: 'three' },
+          {eventName: 'group1:one'},
+          {eventName: 'group1:two'},
+          {eventName: 'group1:three'},
         ],
         [
-          { logType: 'group2', eventName: 'four' },
-          { logType: 'group2', eventName: 'five' },
-          { logType: 'group2', eventName: 'six' },
+          {eventName: 'group2:four'},
+          {eventName: 'group2:five'},
+          {eventName: 'group2:six'},
         ],
       );
     });
@@ -232,70 +255,70 @@ describe('Logger', () => {
 
   describe('throttling', () => {
     it('automatically flushes logs when the the throttleDuration is met', () => {
-      const logger = new Logger({...config, throttleDuration: 2000,  maxBuffer: 3});
-      logger.log('yup', 'one');
-      logger.log('yup', 'two');
+      const logger = Logger.create({...config, throttleDuration: 2000,  maxBuffer: 3});
+      logger.info('one');
+      logger.info('two');
       jest.advanceTimersByTime(2001);
 
       expectToHaveLogged([
-        { logType: 'yup', eventName: 'one' },
-        { logType: 'yup', eventName: 'two' },
+        { eventName: 'one' },
+        { eventName: 'two' },
       ]);
     });
 
     it('does not log before the buffer is full or the duration is met', () => {
-      const logger = new Logger({...config, throttleDuration: 2000,  maxBuffer: 3});
-      logger.log('nope', 'one');
-      logger.log('nope', 'two');
+      const logger = Logger.create({...config, throttleDuration: 2000,  maxBuffer: 3});
+      logger.info('nope:one');
+      logger.info('nope:two');
       jest.advanceTimersByTime(1000);
 
       expect(logs.length).toBe(0);
     });
 
     it('resets the timer when a new log entry is made', () => {
-      const logger = new Logger({...config, throttleDuration: 2000,  maxBuffer: 3});
-      logger.log('nope', 'one');
+      const logger = Logger.create({...config, throttleDuration: 2000,  maxBuffer: 3});
+      logger.info('nope:one');
       jest.advanceTimersByTime(1500);
-      logger.log('nope', 'two');
+      logger.info('nope:two');
       jest.advanceTimersByTime(1500);
 
       expect(logs.length).toBe(0);
     });
 
     it('resets the timer when flushed', async () => {
-      const logger = new Logger({...config, throttleDuration: 2000,  maxBuffer: 3});
-      logger.log('yup', 'one');
-      logger.log('yup', 'two');
+      const logger = Logger.create({...config, throttleDuration: 2000,  maxBuffer: 3});
+      logger.info('yup:one');
+      logger.info('yup:two');
       jest.advanceTimersByTime(1000);
       await logger.flush();
-      logger.log('nope', 'one'); // Should not be logged yet
+      logger.info('nope:one'); // Should not be logged yet
       jest.advanceTimersByTime(1900);
 
       expectToHaveLogged([
-        { logType: 'yup', eventName: 'one' },
-        { logType: 'yup', eventName: 'two' },
+        { eventName: 'yup:one' },
+        { eventName: 'yup:two' },
       ]);
     });
   });
 
   describe('autoRetry', () => {
     it('retries the flush when fetch fails', async () => {
-      const logger = new Logger({...config, autoRetryDuration: 1000});
+      const logger = Logger.create({...config, autoRetryDuration: 1000});
       jest.spyOn(window, 'fetch').mockRejectedValueOnce('Oops, no network!');
-      logger.log('yup', 'one');
+      logger.info('yup:one');
       await logger.flush();
       logs.length = 0;
       jest.advanceTimersByTime(1000);
 
       expectToHaveLogged([
-        { logType: 'yup', eventName: 'one' },
+        { eventName: 'yup:one' },
       ]);
     });
 
     it('stops retrying when fetch succeeds', async () => {
-      const logger = new Logger({...config, autoRetryDuration: 1000});
+      const logger = Logger.create({...config, autoRetryDuration: 1000});
       jest.spyOn(window, 'fetch').mockRejectedValueOnce('Oops, no network!');
-      logger.log('yup', 'one');
+      logger.info('yup:one');
       await logger.flush();
       logs.length = 0;
       jest.advanceTimersByTime(1000);
@@ -303,14 +326,14 @@ describe('Logger', () => {
       jest.advanceTimersByTime(1000);
 
       expectToHaveLogged([
-        { logType: 'yup', eventName: 'one' },
+        { eventName: 'yup:one' },
       ]);
     });
 
     it('does not retry when autoRetry is false', async () => {
-      const logger = new Logger({...config, autoRetry: false, autoRetryDuration: 1000});
+      const logger = Logger.create({...config, autoRetry: false, autoRetryDuration: 1000});
       jest.spyOn(window, 'fetch').mockRejectedValueOnce('Oops, no network!');
-      logger.log('yup', 'one');
+      logger.info('yup:one');
       await logger.flush();
       logs.length = 0;
       jest.advanceTimersByTime(1000);

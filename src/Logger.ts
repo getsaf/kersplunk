@@ -14,7 +14,7 @@ export type SplunkMeta = {
 };
 
 export type SplunkMetaFactory = () => SplunkMeta;
-export type BeforeLogHook = (originalDetails: undefined | object) => undefined | object;
+export type LogInterceptor = (originalDetails: undefined | object) => undefined | object;
 export type CustomLogger<TLogTypes extends string> =
   Logger
   & Record<TLogTypes, (eventName: string, details?: object) => void>;
@@ -25,7 +25,7 @@ type CoreLoggerConfiguration = {
   maxBuffer: number;
   throttleDuration: number;
   splunkMeta?: SplunkMeta | SplunkMetaFactory;
-  beforeLog?: BeforeLogHook;
+  interceptor?: LogInterceptor;
   autoRetry: boolean;
   autoRetryDuration?: number;
 };
@@ -57,21 +57,21 @@ export class Logger {
     config: LoggerConfiguration,
     ...logTypes: TLogTypes
   ): TLogTypes[number] extends never ? DefaultLogger : CustomLogger<TLogTypes[number]> {
-    window.__kersplunkSingleton = window.__kersplunkSingleton
-      || Logger.custom(config, ...(logTypes.length ? logTypes : DEFAULT_LOG_TYPES));
+    window.__kersplunkSingleton = window.__kersplunkSingleton || Logger.create(config, ...logTypes);
 
     return window.__kersplunkSingleton as any;
   }
 
-  public static custom<TLogTypes extends string[]>(
+  public static create<TLogTypes extends string[]>(
     config: LoggerConfiguration,
     ...logTypes: TLogTypes
   ): TLogTypes[number] extends never ? DefaultLogger : CustomLogger<TLogTypes[number]> {
     const logger = new Logger(config);
+    const finalLogTypes: string[] = logTypes.length ? logTypes : DEFAULT_LOG_TYPES;
 
-    Object.assign(logger, logTypes.reduce((acc, name) => ({
+    Object.assign(logger, finalLogTypes.reduce((acc, logType) => ({
       ...acc,
-      [name]: (eventName: string, details?: object) => logger.log(name, eventName, details),
+      [logType]: (eventName: string, details?: object) => logger._log(logType, eventName, details),
     }), {}));
 
     return logger as any;
@@ -81,33 +81,14 @@ export class Logger {
     window.__kersplunkSingleton = undefined;
   }
 
+  public interceptor?: LogInterceptor;
   private _config: CoreLoggerConfiguration;
   private _buffer: string[] = [];
   private _bufferTimeout?: NodeJS.Timeout;
 
-  constructor(config: LoggerConfiguration) {
+  private constructor(config: LoggerConfiguration) {
     this._config = {...DEFAULT_CONFIG, ...config};
-  }
-
-  public log(logType: string, eventName: string, details?: object) {
-    const finalDetails = this._config.beforeLog ? this._config.beforeLog(details) : details;
-    this._buffer = [
-      ...this._buffer,
-      JSON.stringify({
-        time: Date.now() / 1000,
-        sourcetype: '_json',
-        ...(typeof this._config.splunkMeta === 'function' ? this._config.splunkMeta() : this._config.splunkMeta),
-        event: {
-          logType,
-          eventName,
-          ...finalDetails,
-        },
-      }),
-    ];
-    this._startOrResetBufferTimeout();
-    if (this._buffer.length >= this._config.maxBuffer) {
-      this.flush();
-    }
+    this.interceptor = config.interceptor;
   }
 
   public async flush() {
@@ -118,6 +99,28 @@ export class Logger {
     const body = this._buffer.join('\n');
     this._buffer = [];
     await this._flushBodyWithRetry(body);
+  }
+
+  private _log(logType: string, eventName: string, details?: object) {
+    const event = {
+      logType,
+      eventName,
+      ...details,
+    };
+    const finalEvent = this.interceptor ? this.interceptor(event) : event;
+    this._buffer = [
+      ...this._buffer,
+      JSON.stringify({
+        time: Date.now() / 1000,
+        sourcetype: '_json',
+        ...(typeof this._config.splunkMeta === 'function' ? this._config.splunkMeta() : this._config.splunkMeta),
+        event: finalEvent,
+      }),
+    ];
+    this._startOrResetBufferTimeout();
+    if (this._buffer.length >= this._config.maxBuffer) {
+      this.flush();
+    }
   }
 
   private async _flushBodyWithRetry(body: string) {
