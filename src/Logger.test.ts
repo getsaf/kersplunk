@@ -145,7 +145,7 @@ describe('Logger', () => {
       const logger = Logger.create({...config, maxBuffer: 2});
       await logger.flush();
 
-      expect(logs.length).toBe(0);
+      expect(logs).toHaveLength(0);
     });
   });
 
@@ -272,7 +272,7 @@ describe('Logger', () => {
       logger.info('nope:two');
       jest.advanceTimersByTime(1000);
 
-      expect(logs.length).toBe(0);
+      expect(logs).toHaveLength(0);
     });
 
     it('resets the timer when a new log entry is made', () => {
@@ -282,7 +282,7 @@ describe('Logger', () => {
       logger.info('nope:two');
       jest.advanceTimersByTime(1500);
 
-      expect(logs.length).toBe(0);
+      expect(logs).toHaveLength(0);
     });
 
     it('resets the timer when flushed', async () => {
@@ -339,7 +339,79 @@ describe('Logger', () => {
       jest.advanceTimersByTime(1000);
       await Promise.resolve();
 
-      expect(logs.length).toBe(0);
+      expect(logs).toHaveLength(0);
+    });
+  });
+
+  describe('disabled', () => {
+    it('does not log when disabled in the confg', async () => {
+      const logger = Logger.create({...config, enabled: false});
+      logger.info('nope');
+      await logger.flush();
+
+      expect(logs).toHaveLength(0);
+    });
+
+    it('does not log when disabled after creation', async () => {
+      const logger = Logger.create({...config, enabled: true});
+      logger.disable();
+      logger.info('nope');
+      await logger.flush();
+
+      expect(logs).toHaveLength(0);
+    });
+
+    it('does not intercept logs when disabled', async () => {
+      const interceptor = jest.fn();
+      const logger = Logger.create({...config, enabled: false, interceptor});
+      logger.info('nope');
+      await logger.flush();
+
+      expect(interceptor).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('enabled', () => {
+    it('logs when enabled after creation', async () => {
+      const logger = Logger.create({...config, enabled: false});
+      logger.enable();
+      logger.info('yup');
+      await logger.flush();
+
+      expectToHaveLogged([{eventName: 'yup'}]);
+    });
+  });
+
+  describe('logToConsole', () => {
+    beforeEach(() => {
+      jest.spyOn(console, 'log').mockImplementation(() => undefined);
+    });
+
+    describe('enabled', () => {
+      it('logs to the console', async () => {
+        const logger = Logger.create({...config, logToConsole: true});
+        logger.info('yup', {my: 'details'});
+
+        expect(console.log) // tslint:disable-line no-console
+          .toHaveBeenCalledWith('info', 'yup', {my: 'details'});
+      });
+
+      it('logs to the console even when the logger is disabled', async () => {
+        const logger = Logger.create({...config, enabled: false, logToConsole: true});
+        logger.info('yup', {my: 'details'});
+
+        expect(console.log) // tslint:disable-line no-console
+          .toHaveBeenCalledWith('info', 'yup', {my: 'details'});
+      });
+    });
+
+    describe('disabled', () => {
+      it('does not log to the console', async () => {
+        const logger = Logger.create({...config, logToConsole: false});
+        logger.info('yup', {my: 'details'});
+
+        expect(console.log).not.toHaveBeenCalled(); // tslint:disable-line no-console
+      });
     });
   });
 });

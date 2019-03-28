@@ -32,6 +32,7 @@ type CoreLoggerConfiguration = {
   autoRetry: boolean;
   autoRetryDuration: number;
   enabled: boolean;
+  logToConsole: boolean;
 };
 
 const DEFAULT_CONFIG = {
@@ -40,6 +41,7 @@ const DEFAULT_CONFIG = {
   autoRetry: true,
   autoRetryDuration: 1000,
   enabled: true,
+  logToConsole: false,
 };
 
 const DEFAULT_LOG_TYPES = [
@@ -94,6 +96,13 @@ export class Logger {
     this.interceptor = config.interceptor;
   }
 
+  public enable() {
+    this._config.enabled = true;
+  }
+
+  public disable() {
+    this._config.enabled = false;
+  }
   public async flush() {
     this._clearBufferTimeout();
     if (this._buffer.length === 0) {
@@ -105,6 +114,12 @@ export class Logger {
   }
 
   private _log(logType: string, eventName: string, details?: object) {
+    if (this._config.logToConsole) {
+      console.log(logType, eventName, details || ''); // tslint:disable-line no-console
+    }
+    if (!this._config.enabled) {
+      return;
+    }
     const event = {
       logType,
       eventName,
