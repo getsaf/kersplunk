@@ -15,9 +15,12 @@ export type SplunkMeta = {
 
 export type SplunkMetaFactory = () => SplunkMeta;
 export type LogInterceptor = (originalDetails: undefined | object) => undefined | object;
-export type CustomLogger<TLogTypes extends string> =
+export type CustomLogger<TLogTypes extends string[]> =
   Logger
-  & Record<TLogTypes, (eventName: string, details?: object) => void>;
+  & Record<
+    TLogTypes[number] extends never ? (typeof DEFAULT_LOG_TYPES)[number] : TLogTypes[number],
+    (eventName: string, details?: object) => void
+  >;
 
 type CoreLoggerConfiguration = {
   splunkUrl: string;
@@ -27,7 +30,9 @@ type CoreLoggerConfiguration = {
   splunkMeta?: SplunkMeta | SplunkMetaFactory;
   interceptor?: LogInterceptor;
   autoRetry: boolean;
-  autoRetryDuration?: number;
+  autoRetryDuration: number;
+  enabled: boolean;
+  logToConsole: boolean;
 };
 
 const DEFAULT_CONFIG = {
@@ -35,6 +40,8 @@ const DEFAULT_CONFIG = {
   throttleDuration: 250,
   autoRetry: true,
   autoRetryDuration: 1000,
+  enabled: true,
+  logToConsole: false,
 };
 
 const DEFAULT_LOG_TYPES = [
@@ -50,13 +57,11 @@ export type LoggerConfiguration =
   Partial<Pick<CoreLoggerConfiguration, keyof typeof DEFAULT_CONFIG>>
   & Pick<CoreLoggerConfiguration, Exclude<keyof CoreLoggerConfiguration, keyof typeof DEFAULT_CONFIG>>;
 
-export type DefaultLogger = CustomLogger<(typeof DEFAULT_LOG_TYPES)[number]>;
-
 export class Logger {
   public static singleton<TLogTypes extends string[]>(
     config: LoggerConfiguration,
     ...logTypes: TLogTypes
-  ): TLogTypes[number] extends never ? DefaultLogger : CustomLogger<TLogTypes[number]> {
+  ): CustomLogger<TLogTypes> {
     window.__kersplunkSingleton = window.__kersplunkSingleton || Logger.create(config, ...logTypes);
 
     return window.__kersplunkSingleton as any;
@@ -65,7 +70,7 @@ export class Logger {
   public static create<TLogTypes extends string[]>(
     config: LoggerConfiguration,
     ...logTypes: TLogTypes
-  ): TLogTypes[number] extends never ? DefaultLogger : CustomLogger<TLogTypes[number]> {
+  ): CustomLogger<TLogTypes> {
     const logger = new Logger(config);
     const finalLogTypes: string[] = logTypes.length ? logTypes : DEFAULT_LOG_TYPES;
 
@@ -91,6 +96,13 @@ export class Logger {
     this.interceptor = config.interceptor;
   }
 
+  public enable() {
+    this._config.enabled = true;
+  }
+
+  public disable() {
+    this._config.enabled = false;
+  }
   public async flush() {
     this._clearBufferTimeout();
     if (this._buffer.length === 0) {
@@ -102,6 +114,12 @@ export class Logger {
   }
 
   private _log(logType: string, eventName: string, details?: object) {
+    if (this._config.logToConsole) {
+      console.log(logType, eventName, details || ''); // tslint:disable-line no-console
+    }
+    if (!this._config.enabled) {
+      return;
+    }
     const event = {
       logType,
       eventName,
