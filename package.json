@@ -1,6 +1,6 @@
 {
   "name": "kersplunk",
-  "version": "0.0.6",
+  "version": "0.0.7",
   "description": "Splunk logging for JavaScript",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
