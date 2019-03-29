@@ -1,4 +1,4 @@
-import 'fetch-everywhere';
+import * as fetchModule from './fetch';
 import { Logger, LoggerConfiguration } from './Logger';
 
 type InterceptedLogs = {
@@ -9,7 +9,7 @@ type InterceptedLogs = {
 
 const interceptLogs = () => {
   const collection: InterceptedLogs[] = [];
-  jest.spyOn(window, 'fetch').mockImplementation((urlOrConfig, config) => {
+  jest.spyOn(fetchModule, 'fetch').mockImplementation((urlOrConfig, config) => {
     const url = typeof urlOrConfig === 'string' ? urlOrConfig : urlOrConfig.url;
     const requestConfig = typeof urlOrConfig === 'string' ? config : urlOrConfig;
     const body = requestConfig && requestConfig.body;
@@ -304,7 +304,7 @@ describe('Logger', () => {
   describe('autoRetry', () => {
     it('retries the flush when fetch fails', async () => {
       const logger = Logger.create({...config, autoRetryDuration: 1000});
-      jest.spyOn(window, 'fetch').mockRejectedValueOnce('Oops, no network!');
+      jest.spyOn(fetchModule, 'fetch').mockRejectedValueOnce('Oops, no network!');
       logger.info('yup:one');
       await logger.flush();
       logs.length = 0;
@@ -317,7 +317,7 @@ describe('Logger', () => {
 
     it('stops retrying when fetch succeeds', async () => {
       const logger = Logger.create({...config, autoRetryDuration: 1000});
-      jest.spyOn(window, 'fetch').mockRejectedValueOnce('Oops, no network!');
+      jest.spyOn(fetchModule, 'fetch').mockRejectedValueOnce('Oops, no network!');
       logger.info('yup:one');
       await logger.flush();
       logs.length = 0;
@@ -332,7 +332,7 @@ describe('Logger', () => {
 
     it('does not retry when autoRetry is false', async () => {
       const logger = Logger.create({...config, autoRetry: false, autoRetryDuration: 1000});
-      jest.spyOn(window, 'fetch').mockRejectedValueOnce('Oops, no network!');
+      jest.spyOn(fetchModule, 'fetch').mockRejectedValueOnce('Oops, no network!');
       logger.info('yup:one');
       await logger.flush();
       logs.length = 0;

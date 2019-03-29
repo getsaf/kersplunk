@@ -38,7 +38,7 @@
     "typescript": "^3.3.4000"
   },
   "dependencies": {
-    "fetch-everywhere": "^1.0.5"
+    "fetch-ponyfill": "^6.0.2"
   },
   "jest": {
     "clearMocks": true,

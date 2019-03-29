@@ -1,4 +1,5 @@
-import 'fetch-everywhere';
+import { fetch } from './fetch';
+
 declare global {
   interface Window {
     __kersplunkSingleton?: Logger;
