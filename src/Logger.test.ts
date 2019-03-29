@@ -1,4 +1,4 @@
-import 'isomorphic-fetch';
+import 'fetch-everywhere';
 import { Logger, LoggerConfiguration } from './Logger';
 
 type InterceptedLogs = {

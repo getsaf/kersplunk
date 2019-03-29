@@ -1,4 +1,4 @@
-import 'isomorphic-fetch';
+import 'fetch-everywhere';
 declare global {
   interface Window {
     __kersplunkSingleton?: Logger;

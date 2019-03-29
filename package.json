@@ -31,7 +31,6 @@
   },
   "homepage": "https://github.com/getsaf/kersplunk#readme",
   "devDependencies": {
-    "@types/isomorphic-fetch": "0.0.35",
     "@types/jest": "^24.0.11",
     "jest": "^24.5.0",
     "ts-jest": "^24.0.0",
@@ -39,7 +38,7 @@
     "typescript": "^3.3.4000"
   },
   "dependencies": {
-    "isomorphic-fetch": "^2.2.1"
+    "fetch-everywhere": "^1.0.5"
   },
   "jest": {
     "clearMocks": true,
