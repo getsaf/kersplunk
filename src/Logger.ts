@@ -1,11 +1,9 @@
 import { fetch } from './fetch';
 import { version } from './version.json';
 
-declare global {
-  interface Window {
-    __kersplunkSingleton?: Logger;
-  }
-}
+declare const global: {
+  __kersplunkSingleton?: Logger;
+};
 
 export type SplunkMeta = {
   time?: number; // epoch time
@@ -69,9 +67,9 @@ export class Logger {
     config: LoggerConfiguration,
     ...logTypes: TLogTypes
   ): CustomLogger<TLogTypes> {
-    window.__kersplunkSingleton = window.__kersplunkSingleton || Logger.create(config, ...logTypes);
+    global.__kersplunkSingleton = global.__kersplunkSingleton || Logger.create(config, ...logTypes);
 
-    return window.__kersplunkSingleton as any;
+    return global.__kersplunkSingleton as CustomLogger<TLogTypes>;
   }
 
   public static create<TLogTypes extends string[]>(
@@ -90,7 +88,7 @@ export class Logger {
   }
 
   public static clearSingleton() {
-    window.__kersplunkSingleton = undefined;
+    global.__kersplunkSingleton = undefined;
   }
 
   public interceptor?: LogInterceptor;
