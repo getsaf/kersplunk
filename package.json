@@ -2,8 +2,8 @@
   "name": "kersplunk",
   "version": "0.0.3",
   "description": "Splunk logging for JavaScript",
-  "main": "index.js",
-  "types": "index.d.ts",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
   "scripts": {
     "preversion": "npm run build:all",
     "postversion": "echo 'Now run:\ngit push --follow-tags && npm publish'",
