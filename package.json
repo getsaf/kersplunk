@@ -5,9 +5,10 @@
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "scripts": {
-    "preversion": "npm run build:all",
-    "postversion": "echo 'Now run:\ngit push --follow-tags && npm publish'",
+    "preversion": "sh -c set && npm run build:all",
+    "postversion": "npm run build:version-json && echo 'Now run:\ngit push --follow-tags && npm publish'",
     "build:all": "npm run lint && npm run test && npm run build",
+    "build:version-json": "node ./scripts/generate-version-json.js",
     "build": "npm run clean && tsc",
     "clean": "rm -rf dist",
     "test": "jest",

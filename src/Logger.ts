@@ -1,4 +1,5 @@
 import { fetch } from './fetch';
+import { version } from './version.json';
 
 declare global {
   interface Window {
@@ -12,6 +13,7 @@ export type SplunkMeta = {
   source?: string;
   sourcetype?: string;
   index?: string;
+  fields?: object;
 };
 
 export type SplunkMetaFactory = () => SplunkMeta;
@@ -34,6 +36,7 @@ type CoreLoggerConfiguration = {
   autoRetryDuration: number;
   enabled: boolean;
   logToConsole: boolean;
+  errorFormatter: (err: any) => object | undefined;
 };
 
 const DEFAULT_CONFIG = {
@@ -43,6 +46,9 @@ const DEFAULT_CONFIG = {
   autoRetryDuration: 1000,
   enabled: true,
   logToConsole: false,
+  errorFormatter: (err: any) => err instanceof Error
+      ? {name: err.name, message: err.message, stack: err.stack}
+      : err,
 };
 
 const DEFAULT_LOG_TYPES = [
@@ -114,6 +120,20 @@ export class Logger {
     await this._flushBodyWithRetry(body);
   }
 
+  private _buildSplunkMeta() {
+    const meta = typeof this._config.splunkMeta === 'function'
+      ? this._config.splunkMeta()
+      : this._config.splunkMeta;
+
+    return {
+      time: Date.now() / 1000,
+      sourcetype: '_json',
+      source: `kersplunk-${version}`,
+      ...meta,
+      fields: {...(meta && meta.fields), kersplunk: version},
+    };
+  }
+
   private _log(logType: string, eventName: string, details?: object) {
     if (this._config.logToConsole) {
       console.log(logType, eventName, details || ''); // tslint:disable-line no-console
@@ -124,15 +144,13 @@ export class Logger {
     const event = {
       logType,
       eventName,
-      ...details,
+      ...this._config.errorFormatter(details),
     };
     const finalEvent = this.interceptor ? this.interceptor(event) : event;
     this._buffer = [
       ...this._buffer,
       JSON.stringify({
-        time: Date.now() / 1000,
-        sourcetype: '_json',
-        ...(typeof this._config.splunkMeta === 'function' ? this._config.splunkMeta() : this._config.splunkMeta),
+        ...this._buildSplunkMeta(),
         event: finalEvent,
       }),
     ];

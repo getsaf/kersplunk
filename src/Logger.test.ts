@@ -166,6 +166,9 @@ describe('Logger', () => {
       );
     });
 
+  });
+
+  describe('splunkMeta', () => {
     it('incudes static splunkMeta properties', async () => {
       const logger = Logger.create({...config, splunkMeta: {time: 123, host: 'my host'}});
       logger.info('foo');
@@ -197,6 +200,29 @@ describe('Logger', () => {
 
       expect(logs[0].logs[0]).toEqual(expect.objectContaining({
         time: 123, host: 'my host',
+      }));
+    });
+
+    it('includes kersplunk version in the fields', async () => {
+      const logger = Logger.create(config);
+      logger.info('foo');
+      await logger.flush();
+
+      expect(logs[0].logs[0]).toEqual(expect.objectContaining({
+        fields: { kersplunk: expect.stringMatching(/^\d+\.\d+\.\d+/) },
+      }));
+    });
+
+    it('includes kersplunk version on top of user-specified fields', async () => {
+      const logger = Logger.create({
+        ...config,
+        splunkMeta: {time: 123, host: 'my host', fields: {foo: 'bar'}},
+      });
+      logger.info('foo');
+      await logger.flush();
+
+      expect(logs[0].logs[0]).toEqual(expect.objectContaining({
+        fields: { foo: 'bar', kersplunk: expect.stringMatching(/^\d+\.\d+\.\d+/) },
       }));
     });
   });
@@ -412,6 +438,20 @@ describe('Logger', () => {
 
         expect(console.log).not.toHaveBeenCalled(); // tslint:disable-line no-console
       });
+    });
+  });
+
+  describe('autoFormatErrors', () => {
+    it('reformats error objects automatically', async () => {
+      let err: any;
+      try { throw new Error('Boom!'); } catch (e) { err = e; }
+      const logger = Logger.create(config);
+      logger.info('foo', err);
+      logger.flush();
+
+      expectToHaveLogged([
+        {message: 'Boom!', name: 'Error', stack: expect.stringMatching(/.+/)},
+      ]);
     });
   });
 });
