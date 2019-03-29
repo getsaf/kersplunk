@@ -5,7 +5,7 @@
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "scripts": {
-    "preversion": "sh -c set && npm run build:all",
+    "preversion": "npm run build:all",
     "postversion": "npm run build:version-json && echo 'Now run:\ngit push --follow-tags && npm publish'",
     "build:all": "npm run lint && npm run test && npm run build",
     "build:version-json": "node ./scripts/generate-version-json.js",
