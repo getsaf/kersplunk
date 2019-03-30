@@ -15,11 +15,14 @@ export type SplunkMeta = {
 };
 
 export type SplunkMetaFactory = () => SplunkMeta;
-export type LogInterceptor = (originalDetails: undefined | object) => undefined | object;
-export type CustomLogger<TLogTypes extends string[]> =
-  Logger
-  & Record<
-    TLogTypes[number] extends never ? (typeof DEFAULT_LOG_TYPES)[number] : TLogTypes[number],
+export type LogInterceptor = (
+  originalDetails: undefined | object
+) => undefined | object;
+export type CustomLogger<TLogTypes extends string[]> = Logger &
+  Record<
+    TLogTypes[number] extends never
+      ? (typeof DEFAULT_LOG_TYPES)[number]
+      : TLogTypes[number],
     (eventName: string, details?: object) => void
   >;
 
@@ -34,7 +37,7 @@ type CoreLoggerConfiguration = {
   autoRetryDuration: number;
   enabled: boolean;
   logToConsole: boolean;
-  errorFormatter: (err: any) => object | undefined;
+  errorFormatter: (err: Error) => object;
 };
 
 const DEFAULT_CONFIG = {
@@ -44,9 +47,11 @@ const DEFAULT_CONFIG = {
   autoRetryDuration: 1000,
   enabled: true,
   logToConsole: false,
-  errorFormatter: (err: any) => err instanceof Error
-      ? {name: err.name, message: err.message, stack: err.stack}
-      : err,
+  errorFormatter: (err: Error) => ({
+    name: err.name,
+    message: err.message,
+    stack: err.stack,
+  }),
 };
 
 const DEFAULT_LOG_TYPES = [
@@ -58,16 +63,21 @@ const DEFAULT_LOG_TYPES = [
 
 // Only require the user to supply values that are not
 // part of the DEFAULT_CONFIG
-export type LoggerConfiguration =
-  Partial<Pick<CoreLoggerConfiguration, keyof typeof DEFAULT_CONFIG>>
-  & Pick<CoreLoggerConfiguration, Exclude<keyof CoreLoggerConfiguration, keyof typeof DEFAULT_CONFIG>>;
+export type LoggerConfiguration = Partial<
+  Pick<CoreLoggerConfiguration, keyof typeof DEFAULT_CONFIG>
+> &
+  Pick<
+    CoreLoggerConfiguration,
+    Exclude<keyof CoreLoggerConfiguration, keyof typeof DEFAULT_CONFIG>
+  >;
 
 export class Logger {
   public static singleton<TLogTypes extends string[]>(
     config: LoggerConfiguration,
     ...logTypes: TLogTypes
   ): CustomLogger<TLogTypes> {
-    global.__kersplunkSingleton = global.__kersplunkSingleton || Logger.create(config, ...logTypes);
+    global.__kersplunkSingleton =
+      global.__kersplunkSingleton || Logger.create(config, ...logTypes);
 
     return global.__kersplunkSingleton as CustomLogger<TLogTypes>;
   }
@@ -77,12 +87,21 @@ export class Logger {
     ...logTypes: TLogTypes
   ): CustomLogger<TLogTypes> {
     const logger = new Logger(config);
-    const finalLogTypes: string[] = logTypes.length ? logTypes : DEFAULT_LOG_TYPES;
+    const finalLogTypes: string[] = logTypes.length
+      ? logTypes
+      : DEFAULT_LOG_TYPES;
 
-    Object.assign(logger, finalLogTypes.reduce((acc, logType) => ({
-      ...acc,
-      [logType]: (eventName: string, details?: object) => logger._log(logType, eventName, details),
-    }), {}));
+    Object.assign(
+      logger,
+      finalLogTypes.reduce(
+        (acc, logType) => ({
+          ...acc,
+          [logType]: (eventName: string, details?: object) =>
+            logger._log(logType, eventName, details),
+        }),
+        {}
+      )
+    );
 
     return logger as any;
   }
@@ -97,7 +116,7 @@ export class Logger {
   private _bufferTimeout?: NodeJS.Timeout;
 
   private constructor(config: LoggerConfiguration) {
-    this._config = {...DEFAULT_CONFIG, ...config};
+    this._config = { ...DEFAULT_CONFIG, ...config };
     this.interceptor = config.interceptor;
   }
 
@@ -119,16 +138,17 @@ export class Logger {
   }
 
   private _buildSplunkMeta() {
-    const meta = typeof this._config.splunkMeta === 'function'
-      ? this._config.splunkMeta()
-      : this._config.splunkMeta;
+    const meta =
+      typeof this._config.splunkMeta === 'function'
+        ? this._config.splunkMeta()
+        : this._config.splunkMeta;
 
     return {
       time: Date.now() / 1000,
       sourcetype: '_json',
       source: `kersplunk-${version}`,
       ...meta,
-      fields: {...(meta && meta.fields), kersplunk: version},
+      fields: { ...(meta && meta.fields), kersplunk: version },
     };
   }
 
@@ -142,7 +162,9 @@ export class Logger {
     const event = {
       logType,
       eventName,
-      ...this._config.errorFormatter(details),
+      ...(details instanceof Error
+        ? this._config.errorFormatter(details)
+        : details),
     };
     const finalEvent = this.interceptor ? this.interceptor(event) : event;
     this._buffer = [
@@ -160,14 +182,17 @@ export class Logger {
 
   private async _flushBodyWithRetry(body: string) {
     try {
-      await fetch( this._config.splunkUrl, {
+      await fetch(this._config.splunkUrl, {
         method: 'POST',
-        headers: {Authorization: `Splunk ${this._config.authToken}`},
+        headers: { Authorization: `Splunk ${this._config.authToken}` },
         body,
       });
     } catch (e) {
       if (this._config.autoRetry) {
-        setTimeout(() => this._flushBodyWithRetry(body), this._config.autoRetryDuration);
+        setTimeout(
+          () => this._flushBodyWithRetry(body),
+          this._config.autoRetryDuration
+        );
       }
     }
   }
@@ -176,7 +201,10 @@ export class Logger {
     if (this._bufferTimeout) {
       clearTimeout(this._bufferTimeout);
     }
-    this._bufferTimeout = setTimeout(() => this.flush(), this._config.throttleDuration);
+    this._bufferTimeout = setTimeout(
+      () => this.flush(),
+      this._config.throttleDuration
+    );
   }
 
   private _clearBufferTimeout() {

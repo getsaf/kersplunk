@@ -3,7 +3,7 @@ import { Logger, LoggerConfiguration } from './Logger';
 
 type InterceptedLogs = {
   url: string;
-  requestConfig: any,
+  requestConfig: any;
   logs: any[];
 };
 
@@ -11,14 +11,15 @@ const interceptLogs = () => {
   const collection: InterceptedLogs[] = [];
   jest.spyOn(fetchModule, 'fetch').mockImplementation((urlOrConfig, config) => {
     const url = typeof urlOrConfig === 'string' ? urlOrConfig : urlOrConfig.url;
-    const requestConfig = typeof urlOrConfig === 'string' ? config : urlOrConfig;
+    const requestConfig =
+      typeof urlOrConfig === 'string' ? config : urlOrConfig;
     const body = requestConfig && requestConfig.body;
-    const stringBody = body && body.toString() || 'null';
+    const stringBody = (body && body.toString()) || 'null';
 
     collection.push({
       url,
       requestConfig,
-      logs: stringBody.split('\n').map((line) => JSON.parse(line)),
+      logs: stringBody.split('\n').map(line => JSON.parse(line)),
     });
     return Promise.resolve({} as any);
   });
@@ -30,13 +31,15 @@ describe('Logger', () => {
   let logs: InterceptedLogs[];
   const expectToHaveLogged = (...expectedLogs: object[][]) => {
     expect(logs).toEqual(
-      expectedLogs.map((log) =>
+      expectedLogs.map(log =>
         expect.objectContaining({
-          logs: log.map((groupedLog) => expect.objectContaining({
-            event: expect.objectContaining(groupedLog),
-          })),
-        }),
-      ),
+          logs: log.map(groupedLog =>
+            expect.objectContaining({
+              event: expect.objectContaining(groupedLog),
+            })
+          ),
+        })
+      )
     );
   };
 
@@ -98,7 +101,7 @@ describe('Logger', () => {
       logger.info('fooEvent');
       logger.flush();
 
-      expectToHaveLogged([{logType: 'info', eventName: 'fooEvent'}]);
+      expectToHaveLogged([{ logType: 'info', eventName: 'fooEvent' }]);
     });
 
     it('can create a logger with custom log types', async () => {
@@ -106,7 +109,7 @@ describe('Logger', () => {
       logger.foo('fooEvent');
       await logger.flush();
 
-      expectToHaveLogged([ {logType: 'foo', eventName: 'fooEvent'} ]);
+      expectToHaveLogged([{ logType: 'foo', eventName: 'fooEvent' }]);
     });
   });
 
@@ -122,8 +125,8 @@ describe('Logger', () => {
 
   describe('flush', () => {
     it('submits to the collector endpoint', async () => {
-      const logger = Logger.create({...config, splunkUrl: 'http://foo-bar'});
-      logger.info('barEvent', {baz: 'bat'});
+      const logger = Logger.create({ ...config, splunkUrl: 'http://foo-bar' });
+      logger.info('barEvent', { baz: 'bat' });
       await logger.flush();
 
       expect(logs).toEqual([
@@ -132,17 +135,19 @@ describe('Logger', () => {
     });
 
     it('authenticates with the hecToken', async () => {
-      const logger = Logger.create({...config, authToken: 'FOO-TOKEN'});
-      logger.info('barEvent', {baz: 'bat'});
+      const logger = Logger.create({ ...config, authToken: 'FOO-TOKEN' });
+      logger.info('barEvent', { baz: 'bat' });
       await logger.flush();
 
       expect(logs[0].requestConfig).toEqual(
-        expect.objectContaining({headers: {Authorization: 'Splunk FOO-TOKEN'}}),
+        expect.objectContaining({
+          headers: { Authorization: 'Splunk FOO-TOKEN' },
+        })
       );
     });
 
     it('does not submit when buffer is empty', async () => {
-      const logger = Logger.create({...config, maxBuffer: 2});
+      const logger = Logger.create({ ...config, maxBuffer: 2 });
       await logger.flush();
 
       expect(logs).toHaveLength(0);
@@ -152,31 +157,34 @@ describe('Logger', () => {
   describe('logging', () => {
     it('serializes the details immediately so later mutations do not affect older logs', async () => {
       const logger = Logger.create(config);
-      const details = {foo: 'foo'};
+      const details = { foo: 'foo' };
       logger.info('one', details);
       details.foo = 'new foo';
       logger.info('two', details);
       await logger.flush();
 
-      expectToHaveLogged(
-        [
-          { eventName: 'one', foo: 'foo' },
-          { eventName: 'two', foo: 'new foo' },
-        ],
-      );
+      expectToHaveLogged([
+        { eventName: 'one', foo: 'foo' },
+        { eventName: 'two', foo: 'new foo' },
+      ]);
     });
-
   });
 
   describe('splunkMeta', () => {
     it('incudes static splunkMeta properties', async () => {
-      const logger = Logger.create({...config, splunkMeta: {time: 123, host: 'my host'}});
+      const logger = Logger.create({
+        ...config,
+        splunkMeta: { time: 123, host: 'my host' },
+      });
       logger.info('foo');
       await logger.flush();
 
-      expect(logs[0].logs[0]).toEqual(expect.objectContaining({
-        time: 123, host: 'my host',
-      }));
+      expect(logs[0].logs[0]).toEqual(
+        expect.objectContaining({
+          time: 123,
+          host: 'my host',
+        })
+      );
     });
 
     it('provides a timestamp with <sec>.<ms> by default', async () => {
@@ -185,22 +193,27 @@ describe('Logger', () => {
       logger.info('foo');
       await logger.flush();
 
-      expect(logs[0].logs[0]).toEqual(expect.objectContaining({
-        time: 12.345,
-      }));
+      expect(logs[0].logs[0]).toEqual(
+        expect.objectContaining({
+          time: 12.345,
+        })
+      );
     });
 
     it('incudes dynamic splunkMeta properties', async () => {
       const logger = Logger.create({
         ...config,
-        splunkMeta: () => ({time: 123, host: 'my host'}),
+        splunkMeta: () => ({ time: 123, host: 'my host' }),
       });
       logger.info('foo');
       await logger.flush();
 
-      expect(logs[0].logs[0]).toEqual(expect.objectContaining({
-        time: 123, host: 'my host',
-      }));
+      expect(logs[0].logs[0]).toEqual(
+        expect.objectContaining({
+          time: 123,
+          host: 'my host',
+        })
+      );
     });
 
     it('includes kersplunk version in the fields', async () => {
@@ -208,22 +221,29 @@ describe('Logger', () => {
       logger.info('foo');
       await logger.flush();
 
-      expect(logs[0].logs[0]).toEqual(expect.objectContaining({
-        fields: { kersplunk: expect.stringMatching(/^\d+\.\d+\.\d+/) },
-      }));
+      expect(logs[0].logs[0]).toEqual(
+        expect.objectContaining({
+          fields: { kersplunk: expect.stringMatching(/^\d+\.\d+\.\d+/) },
+        })
+      );
     });
 
     it('includes kersplunk version on top of user-specified fields', async () => {
       const logger = Logger.create({
         ...config,
-        splunkMeta: {time: 123, host: 'my host', fields: {foo: 'bar'}},
+        splunkMeta: { time: 123, host: 'my host', fields: { foo: 'bar' } },
       });
       logger.info('foo');
       await logger.flush();
 
-      expect(logs[0].logs[0]).toEqual(expect.objectContaining({
-        fields: { foo: 'bar', kersplunk: expect.stringMatching(/^\d+\.\d+\.\d+/) },
-      }));
+      expect(logs[0].logs[0]).toEqual(
+        expect.objectContaining({
+          fields: {
+            foo: 'bar',
+            kersplunk: expect.stringMatching(/^\d+\.\d+\.\d+/),
+          },
+        })
+      );
     });
   });
 
@@ -231,31 +251,37 @@ describe('Logger', () => {
     it('modifies the outgoing log details with intercept return', async () => {
       const logger = Logger.create({
         ...config,
-        interceptor: (originalDetails) => ({...originalDetails, newDetails: 'bar'}),
+        interceptor: originalDetails => ({
+          ...originalDetails,
+          newDetails: 'bar',
+        }),
       });
-      logger.info('one', {originalDetails: 'foo'});
+      logger.info('one', { originalDetails: 'foo' });
       await logger.flush();
 
       expectToHaveLogged([
-        {eventName: 'one', originalDetails: 'foo', newDetails: 'bar'},
+        { eventName: 'one', originalDetails: 'foo', newDetails: 'bar' },
       ]);
     });
 
     it('can be set after the logger is created', async () => {
       const logger = Logger.create(config);
-      logger.interceptor = (originalDetails) => ({...originalDetails, newDetails: 'bar'});
-      logger.info('one', {originalDetails: 'foo'});
+      logger.interceptor = originalDetails => ({
+        ...originalDetails,
+        newDetails: 'bar',
+      });
+      logger.info('one', { originalDetails: 'foo' });
       await logger.flush();
 
       expectToHaveLogged([
-        {eventName: 'one', originalDetails: 'foo', newDetails: 'bar'},
+        { eventName: 'one', originalDetails: 'foo', newDetails: 'bar' },
       ]);
     });
   });
 
   describe('buffering', () => {
     it('automatically flushes logs when the buffer is full', () => {
-      const logger = Logger.create({...config, maxBuffer: 3});
+      const logger = Logger.create({ ...config, maxBuffer: 3 });
       logger.info('group1:one');
       logger.info('group1:two');
       logger.info('group1:three');
@@ -266,34 +292,39 @@ describe('Logger', () => {
 
       expectToHaveLogged(
         [
-          {eventName: 'group1:one'},
-          {eventName: 'group1:two'},
-          {eventName: 'group1:three'},
+          { eventName: 'group1:one' },
+          { eventName: 'group1:two' },
+          { eventName: 'group1:three' },
         ],
         [
-          {eventName: 'group2:four'},
-          {eventName: 'group2:five'},
-          {eventName: 'group2:six'},
-        ],
+          { eventName: 'group2:four' },
+          { eventName: 'group2:five' },
+          { eventName: 'group2:six' },
+        ]
       );
     });
   });
 
   describe('throttling', () => {
     it('automatically flushes logs when the the throttleDuration is met', () => {
-      const logger = Logger.create({...config, throttleDuration: 2000,  maxBuffer: 3});
+      const logger = Logger.create({
+        ...config,
+        throttleDuration: 2000,
+        maxBuffer: 3,
+      });
       logger.info('one');
       logger.info('two');
       jest.advanceTimersByTime(2001);
 
-      expectToHaveLogged([
-        { eventName: 'one' },
-        { eventName: 'two' },
-      ]);
+      expectToHaveLogged([{ eventName: 'one' }, { eventName: 'two' }]);
     });
 
     it('does not log before the buffer is full or the duration is met', () => {
-      const logger = Logger.create({...config, throttleDuration: 2000,  maxBuffer: 3});
+      const logger = Logger.create({
+        ...config,
+        throttleDuration: 2000,
+        maxBuffer: 3,
+      });
       logger.info('nope:one');
       logger.info('nope:two');
       jest.advanceTimersByTime(1000);
@@ -302,7 +333,11 @@ describe('Logger', () => {
     });
 
     it('resets the timer when a new log entry is made', () => {
-      const logger = Logger.create({...config, throttleDuration: 2000,  maxBuffer: 3});
+      const logger = Logger.create({
+        ...config,
+        throttleDuration: 2000,
+        maxBuffer: 3,
+      });
       logger.info('nope:one');
       jest.advanceTimersByTime(1500);
       logger.info('nope:two');
@@ -312,7 +347,11 @@ describe('Logger', () => {
     });
 
     it('resets the timer when flushed', async () => {
-      const logger = Logger.create({...config, throttleDuration: 2000,  maxBuffer: 3});
+      const logger = Logger.create({
+        ...config,
+        throttleDuration: 2000,
+        maxBuffer: 3,
+      });
       logger.info('yup:one');
       logger.info('yup:two');
       jest.advanceTimersByTime(1000);
@@ -320,30 +359,29 @@ describe('Logger', () => {
       logger.info('nope:one'); // Should not be logged yet
       jest.advanceTimersByTime(1900);
 
-      expectToHaveLogged([
-        { eventName: 'yup:one' },
-        { eventName: 'yup:two' },
-      ]);
+      expectToHaveLogged([{ eventName: 'yup:one' }, { eventName: 'yup:two' }]);
     });
   });
 
   describe('autoRetry', () => {
     it('retries the flush when fetch fails', async () => {
-      const logger = Logger.create({...config, autoRetryDuration: 1000});
-      jest.spyOn(fetchModule, 'fetch').mockRejectedValueOnce('Oops, no network!');
+      const logger = Logger.create({ ...config, autoRetryDuration: 1000 });
+      jest
+        .spyOn(fetchModule, 'fetch')
+        .mockRejectedValueOnce('Oops, no network!');
       logger.info('yup:one');
       await logger.flush();
       logs.length = 0;
       jest.advanceTimersByTime(1000);
 
-      expectToHaveLogged([
-        { eventName: 'yup:one' },
-      ]);
+      expectToHaveLogged([{ eventName: 'yup:one' }]);
     });
 
     it('stops retrying when fetch succeeds', async () => {
-      const logger = Logger.create({...config, autoRetryDuration: 1000});
-      jest.spyOn(fetchModule, 'fetch').mockRejectedValueOnce('Oops, no network!');
+      const logger = Logger.create({ ...config, autoRetryDuration: 1000 });
+      jest
+        .spyOn(fetchModule, 'fetch')
+        .mockRejectedValueOnce('Oops, no network!');
       logger.info('yup:one');
       await logger.flush();
       logs.length = 0;
@@ -351,14 +389,18 @@ describe('Logger', () => {
       jest.advanceTimersByTime(1000);
       jest.advanceTimersByTime(1000);
 
-      expectToHaveLogged([
-        { eventName: 'yup:one' },
-      ]);
+      expectToHaveLogged([{ eventName: 'yup:one' }]);
     });
 
     it('does not retry when autoRetry is false', async () => {
-      const logger = Logger.create({...config, autoRetry: false, autoRetryDuration: 1000});
-      jest.spyOn(fetchModule, 'fetch').mockRejectedValueOnce('Oops, no network!');
+      const logger = Logger.create({
+        ...config,
+        autoRetry: false,
+        autoRetryDuration: 1000,
+      });
+      jest
+        .spyOn(fetchModule, 'fetch')
+        .mockRejectedValueOnce('Oops, no network!');
       logger.info('yup:one');
       await logger.flush();
       logs.length = 0;
@@ -371,7 +413,7 @@ describe('Logger', () => {
 
   describe('disabled', () => {
     it('does not log when disabled in the confg', async () => {
-      const logger = Logger.create({...config, enabled: false});
+      const logger = Logger.create({ ...config, enabled: false });
       logger.info('nope');
       await logger.flush();
 
@@ -379,7 +421,7 @@ describe('Logger', () => {
     });
 
     it('does not log when disabled after creation', async () => {
-      const logger = Logger.create({...config, enabled: true});
+      const logger = Logger.create({ ...config, enabled: true });
       logger.disable();
       logger.info('nope');
       await logger.flush();
@@ -389,7 +431,7 @@ describe('Logger', () => {
 
     it('does not intercept logs when disabled', async () => {
       const interceptor = jest.fn();
-      const logger = Logger.create({...config, enabled: false, interceptor});
+      const logger = Logger.create({ ...config, enabled: false, interceptor });
       logger.info('nope');
       await logger.flush();
 
@@ -399,12 +441,12 @@ describe('Logger', () => {
 
   describe('enabled', () => {
     it('logs when enabled after creation', async () => {
-      const logger = Logger.create({...config, enabled: false});
+      const logger = Logger.create({ ...config, enabled: false });
       logger.enable();
       logger.info('yup');
       await logger.flush();
 
-      expectToHaveLogged([{eventName: 'yup'}]);
+      expectToHaveLogged([{ eventName: 'yup' }]);
     });
   });
 
@@ -415,43 +457,64 @@ describe('Logger', () => {
 
     describe('enabled', () => {
       it('logs to the console', async () => {
-        const logger = Logger.create({...config, logToConsole: true});
-        logger.info('yup', {my: 'details'});
+        const logger = Logger.create({ ...config, logToConsole: true });
+        logger.info('yup', { my: 'details' });
 
         expect(console.log) // tslint:disable-line no-console
-          .toHaveBeenCalledWith('info', 'yup', {my: 'details'});
+          .toHaveBeenCalledWith('info', 'yup', { my: 'details' });
       });
 
       it('logs to the console even when the logger is disabled', async () => {
-        const logger = Logger.create({...config, enabled: false, logToConsole: true});
-        logger.info('yup', {my: 'details'});
+        const logger = Logger.create({
+          ...config,
+          enabled: false,
+          logToConsole: true,
+        });
+        logger.info('yup', { my: 'details' });
 
         expect(console.log) // tslint:disable-line no-console
-          .toHaveBeenCalledWith('info', 'yup', {my: 'details'});
+          .toHaveBeenCalledWith('info', 'yup', { my: 'details' });
       });
     });
 
     describe('disabled', () => {
       it('does not log to the console', async () => {
-        const logger = Logger.create({...config, logToConsole: false});
-        logger.info('yup', {my: 'details'});
+        const logger = Logger.create({ ...config, logToConsole: false });
+        logger.info('yup', { my: 'details' });
 
         expect(console.log).not.toHaveBeenCalled(); // tslint:disable-line no-console
       });
     });
   });
 
-  describe('autoFormatErrors', () => {
+  describe('errorFormatter', () => {
     it('reformats error objects automatically', async () => {
-      let err: any;
-      try { throw new Error('Boom!'); } catch (e) { err = e; }
       const logger = Logger.create(config);
-      logger.info('foo', err);
+      try {
+        throw new Error('Boom!');
+      } catch (err) {
+        logger.error('foo', err);
+      }
       logger.flush();
 
       expectToHaveLogged([
-        {message: 'Boom!', name: 'Error', stack: expect.stringMatching(/.+/)},
+        { message: 'Boom!', name: 'Error', stack: expect.stringMatching(/.+/) },
       ]);
+    });
+
+    it('formats errors with custom errorFormatter', async () => {
+      const logger = Logger.create({
+        ...config,
+        errorFormatter: err => ({ woah: err.message.toUpperCase() }),
+      });
+      try {
+        throw new Error('Boom!');
+      } catch (err) {
+        logger.error('whoops', err);
+      }
+      logger.flush();
+
+      expectToHaveLogged([{ woah: 'BOOM!' }]);
     });
   });
 });
