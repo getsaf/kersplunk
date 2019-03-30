@@ -17,7 +17,7 @@
     "lint:fix": "npm run lint:ts:fix && npm run lint:prettier:fix",
     "lint:ts": "tslint -t stylish --project tsconfig.json",
     "lint:ts:fix": "npm run lint:ts -- --fix",
-    "lint:prettier": "prettier '**/*'",
+    "lint:prettier": "prettier '**/*' -l",
     "lint:prettier:fix": "npm run lint:prettier -- --write"
   },
   "repository": {
