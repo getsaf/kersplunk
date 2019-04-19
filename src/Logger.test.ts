@@ -502,6 +502,35 @@ describe('Logger', () => {
       ]);
     });
 
+    it('reformats error deep inside log objects', async () => {
+      const logger = Logger.create({
+        ...config,
+        errorFormatter: (err: Error) => ({
+          datMessage: err.message,
+          foo: 'bar',
+        }),
+      });
+      try {
+        throw new Error('Boom!');
+      } catch (err) {
+        logger.error('foo', { here: { is: { my: err } } });
+      }
+      logger.flush();
+
+      expectToHaveLogged([
+        {
+          here: {
+            is: {
+              my: {
+                datMessage: 'Boom!',
+                foo: 'bar',
+              },
+            },
+          },
+        },
+      ]);
+    });
+
     it('formats errors with custom errorFormatter', async () => {
       const logger = Logger.create({
         ...config,

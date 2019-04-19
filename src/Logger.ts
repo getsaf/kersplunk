@@ -152,6 +152,17 @@ export class Logger {
     };
   }
 
+  private _stringify(obj: object) {
+    const originalToJSON = (Error as any).prototype.toJSON;
+    const { errorFormatter } = this._config;
+    (Error as any).prototype.toJSON = function() {
+      return errorFormatter(this);
+    };
+    const stringified = JSON.stringify(obj);
+    (Error as any).prototype.toJSON = originalToJSON;
+    return stringified;
+  }
+
   private _log(logType: string, eventName: string, details?: object) {
     if (this._config.logToConsole) {
       console.log(logType, eventName, details || ''); // tslint:disable-line no-console
@@ -169,7 +180,7 @@ export class Logger {
     const finalEvent = this.interceptor ? this.interceptor(event) : event;
     this._buffer = [
       ...this._buffer,
-      JSON.stringify({
+      this._stringify({
         ...this._buildSplunkMeta(),
         event: finalEvent,
       }),
