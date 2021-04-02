@@ -21,7 +21,7 @@ export type LogInterceptor = (
 export type CustomLogger<TLogTypes extends string[]> = Logger &
   Record<
     TLogTypes[number] extends never
-      ? (typeof DEFAULT_LOG_TYPES)[number]
+      ? typeof DEFAULT_LOG_TYPES[number]
       : TLogTypes[number],
     (eventName: string, details?: object) => void
   >;
@@ -155,7 +155,7 @@ export class Logger {
   private _stringify(obj: object) {
     const originalToJSON = (Error as any).prototype.toJSON;
     const { errorFormatter } = this._config;
-    (Error as any).prototype.toJSON = function() {
+    (Error as any).prototype.toJSON = function () {
       return errorFormatter(this);
     };
     const stringified = JSON.stringify(obj);
